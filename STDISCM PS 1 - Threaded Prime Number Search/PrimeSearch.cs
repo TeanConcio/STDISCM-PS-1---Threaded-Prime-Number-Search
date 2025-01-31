@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
+
 namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 {
     internal enum PrintMode
@@ -21,6 +23,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         BY_NUMBER = 3
     }
 
+
+
     internal class PrimeSearch
     {
         public static int NumThreads { get; set; }
@@ -28,16 +32,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         public static PrintMode PrintMode { get; set; }
         public static ThreadTaskDivisionMode ThreadTaskDivisionMode { get; set; }
 
-        public static PrimeSearchThread[] Threads { get; set; }
+        public static PrimeSearchThread[] ThreadsList { get; set; }
         public static long StartMilliTime { get; set; }
         public static SortedSet<int> PrimesList { get; set; } = new SortedSet<int>([2, 3, 5, 7]);   // Memoization
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
-        private static int CurrentDivisorChecked { get; set; } = 2;       // For By Divisibility Task Division
-        private static readonly object DivisorCheckLock = new object();
-
-        private static int CurrentNumberChecked { get; set; } = 1;       // For By Number Task Division
+        // For By Divisibility Task Division
+        private static int NumberChecked { get; set; } = 1;              // -1 = end
         private static readonly object NumberCheckLock = new object();
+        private static int PrimeIndexChecked { get; set; } = 0;          // -1 = end
+        private static readonly object PrimeIndexCheckLock = new object();
+        public static int LastThreadChecked { get; set; } = -1;
 
 
 
@@ -128,7 +133,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Initialize Threads
         public static void InitializeThreads()
         {
-            Threads = new PrimeSearchThread[NumThreads];
+            ThreadsList = new PrimeSearchThread[NumThreads];
 
             switch (ThreadTaskDivisionMode)
             {
@@ -147,7 +152,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                                 endNum++;
                                 remainder--;
                             }
-                            Threads[i] = new ByRangePrimeSearchThread(i, startNum, endNum);
+                            ThreadsList[i] = new ByRangePrimeSearchThread(i, startNum, endNum);
                             startNum = endNum + 1;
                             endNum = range + startNum - 1;
                         }
@@ -160,7 +165,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         for (int i = 0; i < NumThreads; i++)
                         {
-                            Threads[i] = new ByDivisibilityPrimeSearchThread(i);
+                            ThreadsList[i] = new ByDivisibilityPrimeSearchThread(i);
                         }
                         break;
                     }
@@ -170,7 +175,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         for (int i = 0; i < NumThreads; i++)
                         {
-                            Threads[i] = new ByNumberPrimeSearchThread(i);
+                            ThreadsList[i] = new ByNumberPrimeSearchThread(i);
                         }
 
                         break;
@@ -187,7 +192,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             // Get Current Time to Milliseconds
             StartMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
 
-            foreach (PrimeSearchThread thread in Threads)
+            foreach (PrimeSearchThread thread in ThreadsList)
             {
                 thread.Start();
             }
@@ -195,14 +200,46 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             // If Thread Task Division Mode is By Divisibility
             if (ThreadTaskDivisionMode == ThreadTaskDivisionMode.BY_DIVISIBILITY)
             {
+                // Do linear search for primes
+                for (NumberChecked = 2; NumberChecked <= PrimeRange; NumberChecked++)
+                {
+                    // Perpetual checking if number is prime or not
 
+                    // While last thread checked is -1 (Multiple found)
+                    // OR the prime index checked is not -1 (Number is prime)
+                    while (LastThreadChecked == -1 && PrimeIndexChecked != -1)
+                    {
+                    }
+
+                    // If the number is not prime
+                    if (LastThreadChecked != -1)
+                    {
+                        break;
+                    }
+
+                    // Add Prime Number to Primes List
+                    PrimeSearch.AddPrime(NumberChecked);
+
+                    // If Print Mode is Immediate
+                    if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
+                    {
+                        Console.WriteLine($"Thread {LastThreadChecked} [{((ByDivisibilityPrimeSearchThread)ThreadsList[LastThreadChecked]).PrimeCheckedMilliTime - PrimeSearch.StartMilliTime} ms]: {NumberChecked} is prime");
+                    }
+
+                    // Reset values
+                    LastThreadChecked = -1;
+                    PrimeIndexChecked = 0;
+                }
+
+                NumberChecked = -1;
+                PrimeIndexChecked = -1;
             }
         }
 
         // Join Threads
         public static void JoinThreads()
         {
-            foreach (PrimeSearchThread thread in Threads)
+            foreach (PrimeSearchThread thread in ThreadsList)
             {
                 thread.Join();
             }
@@ -305,14 +342,23 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get next divisor to check
         public static int GetNextDivisorToCheck()
         {
-            lock (DivisorCheckLock)
+            lock (PrimeIndexCheckLock)
             {
-                if (CurrentDivisorChecked <= PrimeRange)
+                if (PrimeIndexChecked == -1)
                 {
-                    return CurrentDivisorChecked++;
+                    return -1;
+                }
+
+                int nextPrime = PrimesList.ElementAt(PrimeIndexChecked);
+
+                // If the square of the next prime is less than the current number checked
+                if (nextPrime * nextPrime <= NumberChecked)
+                {
+                    return nextPrime;
                 }
                 else
                 {
+                    PrimeIndexChecked = -1;
                     return -1;
                 }
             }
@@ -321,16 +367,28 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get next number to check
         public static int GetNextNumberToCheck()
         {
-            lock (NumberCheckLock)
+            switch (ThreadTaskDivisionMode)
             {
-                if (CurrentNumberChecked <= PrimeRange)
-                {
-                    return CurrentNumberChecked++;
-                }
-                else
-                {
+                case ThreadTaskDivisionMode.BY_RANGE:
                     return -1;
-                }
+
+                case ThreadTaskDivisionMode.BY_DIVISIBILITY:
+                    return NumberChecked;
+
+                case ThreadTaskDivisionMode.BY_NUMBER:
+                    lock (NumberCheckLock)
+                    {
+                        if (NumberChecked <= PrimeRange)
+                        {
+                            return NumberChecked++;
+                        }
+                        else
+                        {
+                            return -1;
+                        }
+                    }
+                default:
+                    return -1;
             }
         }
     }

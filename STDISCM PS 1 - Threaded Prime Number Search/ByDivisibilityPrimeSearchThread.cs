@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 {
+
     internal class ByDivisibilityPrimeSearchThread : PrimeSearchThread
     {
-        private int NumberToCheck { get; set; }
+        public long PrimeCheckedMilliTime { get; set; } = 0;
 
         public ByDivisibilityPrimeSearchThread(int id) : base(id)
         {
@@ -16,33 +17,22 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
         override public void Run()
         {
-            //while (NumberToCheck > 0)
-            //{
-            //    while ()
-            //}
-
-
-
-
             int numberToCheck = PrimeSearch.GetNextNumberToCheck();
-            while (numberToCheck > 0)
+            int divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
+            while (numberToCheck > 0 || divisorToCheck > 0)
             {
-                if (PrimeSearch.IsPrime(numberToCheck))
+                if (divisorToCheck >= 2)
                 {
-                    // Get Current Time in Milliseconds
-                    long milliTimeNow = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-
-                    // Add Prime Number to Primes List
-                    PrimeSearch.AddPrime(numberToCheck);
-
-                    // If Print Mode is Immediate
-                    if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
+                    if (numberToCheck % divisorToCheck == 0)
                     {
-                        Console.WriteLine($"Thread {ID} [{milliTimeNow - PrimeSearch.StartMilliTime} ms]: {numberToCheck} is prime");
+                        // Get timestamp and set the last thread checked
+                        PrimeSearch.LastThreadChecked = ID;
+                        PrimeCheckedMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
                     }
                 }
 
                 numberToCheck = PrimeSearch.GetNextNumberToCheck();
+                divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
             }
         }
     }
