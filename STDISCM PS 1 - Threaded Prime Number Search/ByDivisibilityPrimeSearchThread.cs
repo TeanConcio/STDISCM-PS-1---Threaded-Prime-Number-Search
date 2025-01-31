@@ -21,14 +21,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             int divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
             while (numberToCheck > 0 || divisorToCheck > 0)
             {
-                if (divisorToCheck >= 2)
+                if (divisorToCheck < 2)
                 {
-                    if (numberToCheck % divisorToCheck == 0)
-                    {
-                        // Get timestamp and set the last thread checked
-                        PrimeSearch.LastThreadChecked = ID;
-                        PrimeCheckedMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-                    }
+
+                    // Get timestamp and set the last thread checked
+                    PrimeSearch.LastThreadChecked = ID;
+                    PrimeCheckedMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
                 }
 
                 numberToCheck = PrimeSearch.GetNextNumberToCheck();
