@@ -38,9 +38,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
         // For By Divisibility Task Division
-        private static int NumberChecked { get; set; } = 1;              // -1 = end
+        public static int NumberToCheck { get; set; } = 1;              // -1 = end
         private static readonly object NumberCheckLock = new object();
-        private static int PrimeIndexChecked { get; set; } = 0;          // -1 = end
+        private static int PrimeIndexToCheck { get; set; } = 0;          // -1 = end
         private static readonly object PrimeIndexCheckLock = new object();
         public static int LastThreadChecked { get; set; } = -1;
 
@@ -200,39 +200,32 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             // If Thread Task Division Mode is By Divisibility
             if (ThreadTaskDivisionMode == ThreadTaskDivisionMode.BY_DIVISIBILITY)
             {
-                // Do linear search for primes
-                for (NumberChecked = 2; NumberChecked <= PrimeRange; NumberChecked++)
+                while (NumberToCheck <= PrimeRange)
                 {
                     // Perpetual checking if number is prime or not
 
-                    // While last thread checked is -1 (Multiple found)
-                    // OR the prime index checked is not -1 (Number is prime)
-                    while (LastThreadChecked == -1 && PrimeIndexChecked != -1)
+                    // While last thread checked is -1 (Not yet found prime)
+                    // OR the prime index checked is not -1 (Not yet finish prime list)
+                    while (LastThreadChecked == -1 && PrimeIndexToCheck != -1)
                     {
-                    }
-
-                    // If the number is not prime
-                    if (LastThreadChecked != -1)
-                    {
-                        break;
                     }
 
                     // Add Prime Number to Primes List
-                    PrimeSearch.AddPrime(NumberChecked);
+                    PrimeSearch.AddPrime(NumberToCheck);
 
                     // If Print Mode is Immediate
                     if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
                     {
-                        Console.WriteLine($"Thread {LastThreadChecked} [{((ByDivisibilityPrimeSearchThread)ThreadsList[LastThreadChecked]).PrimeCheckedMilliTime - PrimeSearch.StartMilliTime} ms]: {NumberChecked} is prime");
+                        Console.WriteLine($"Thread {LastThreadChecked} [{((ByDivisibilityPrimeSearchThread)ThreadsList[LastThreadChecked]).PrimeCheckedMilliTime - PrimeSearch.StartMilliTime} ms]: {NumberToCheck} is prime");
                     }
 
                     // Reset values
                     LastThreadChecked = -1;
-                    PrimeIndexChecked = 0;
+                    GetNextNumberToCheck();
                 }
 
-                NumberChecked = -1;
-                PrimeIndexChecked = -1;
+                NumberToCheck = -1;
+                PrimeIndexToCheck = -1;
             }
         }
 
@@ -344,21 +337,21 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             lock (PrimeIndexCheckLock)
             {
-                if (PrimeIndexChecked == -1)
+                if (PrimeIndexToCheck == -1)
                 {
                     return -1;
                 }
 
-                int nextPrime = PrimesList.ElementAt(PrimeIndexChecked);
+                int nextPrime = PrimesList.ElementAt(PrimeIndexToCheck++);
 
                 // If the square of the next prime is less than the current number checked
-                if (nextPrime * nextPrime <= NumberChecked)
+                if (nextPrime * nextPrime <= NumberToCheck)
                 {
                     return nextPrime;
                 }
                 else
                 {
-                    PrimeIndexChecked = -1;
+                    PrimeIndexToCheck = -1;
                     return -1;
                 }
             }
@@ -367,28 +360,21 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get next number to check
         public static int GetNextNumberToCheck()
         {
-            switch (ThreadTaskDivisionMode)
+            lock (NumberCheckLock)
             {
-                case ThreadTaskDivisionMode.BY_RANGE:
+                if (NumberToCheck == -1)
+                {
                     return -1;
-
-                case ThreadTaskDivisionMode.BY_DIVISIBILITY:
-                    return NumberChecked;
-
-                case ThreadTaskDivisionMode.BY_NUMBER:
-                    lock (NumberCheckLock)
-                    {
-                        if (NumberChecked <= PrimeRange)
-                        {
-                            return NumberChecked++;
-                        }
-                        else
-                        {
-                            return -1;
-                        }
-                    }
-                default:
+                }
+                else if (NumberToCheck <= PrimeRange)
+                {
+                    PrimeIndexToCheck = 0;
+                    return NumberToCheck++;
+                }
+                else
+                {
                     return -1;
+                }
             }
         }
     }
