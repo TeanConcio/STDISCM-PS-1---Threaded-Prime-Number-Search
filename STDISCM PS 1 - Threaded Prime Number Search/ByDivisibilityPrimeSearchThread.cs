@@ -9,7 +9,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
     internal class ByDivisibilityPrimeSearchThread : PrimeSearchThread
     {
-        public long PrimeCheckedMilliTime { get; set; } = 0;
+        public ThreadStatus Status { get; set; } = ThreadStatus.RUNNING;
 
         public ByDivisibilityPrimeSearchThread(int id) : base(id)
         {
@@ -17,32 +17,54 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
         override public void Run()
         {
-            int numberToCheck = PrimeSearch.NumberToCheck;
-            int divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
-            while (numberToCheck > 0 || divisorToCheck > 0)
+            int numberToCheck;
+            int divisorToCheck;
+
+            // While there is still a number to check
+            do
             {
-                // If reach the end of the list, announce prime
-                if (divisorToCheck < 2)
+                // Get the next number and divisor to check
+                divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
+                numberToCheck = PrimeSearch.NumberToCheck;
+
+                // If divisor to check is finished, wait until ready
+                if (divisorToCheck == -2)
                 {
-                    // Check if still available to announce prime
-                    if (PrimeSearch.LastThreadChecked == -1)
-                    {
-                        // Get timestamp and set the last thread checked
-                        PrimeSearch.LastThreadChecked = ID;
-                        PrimeCheckedMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-                    }
+                    Status = ThreadStatus.WAITING;
+                    continue;
+                }
+
+                // If last to check, announce that the thread last checked the number
+                if (numberToCheck >= 2 && divisorToCheck == -1)
+                {
+                    PrimeSearch.LastThreadChecked = ID;
+                    PrimeSearch.LastCheckMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+
+                    Status = ThreadStatus.RUNNING;
                 }
 
                 // If the number is divisible by the divisor or is less than 2, it is not prime
                 else if (numberToCheck < 2 || numberToCheck % divisorToCheck == 0)
                 {
-                    // Get the next number to check
-                    PrimeSearch.GetNextNumberToCheck();
-                }
+                    PrimeSearch.MultipleFound = true;
+                    PrimeSearch.SetPrimeIndexToCheck(-2);
 
-                numberToCheck = PrimeSearch.NumberToCheck;
-                divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
+                    Status = ThreadStatus.RUNNING;
+                }
             }
+            while (numberToCheck > 0);
+
+            Status = ThreadStatus.FINISHED;
         }
+    }
+
+
+
+    // Enum of status of the thread
+    public enum ThreadStatus
+    {
+        RUNNING,
+        WAITING,
+        FINISHED
     }
 }
