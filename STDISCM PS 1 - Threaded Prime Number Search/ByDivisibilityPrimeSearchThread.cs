@@ -19,7 +19,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             while (PrimeSearch.NumberToCheck <= PrimeSearch.PrimeRange)
             {
-                if (PrimeSearch.CurrentlyProcessing || PrimeSearch.MultipleFound)
+                if (PrimeSearch.MainIsProcessing || PrimeSearch.NumberIsComposite)
                 {
                     Status = ThreadStatus.WAITING;
                     continue;
@@ -46,21 +46,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     // If the number is divisible by the divisor or is less than 2, it is not prime
                     if ((PrimeSearch.NumberToCheck < 2 || (divisorToCheck > 1 && PrimeSearch.NumberToCheck % divisorToCheck == 0)))
                     {
-                        if (PrimeSearch.CurrentlyProcessing || PrimeSearch.MultipleFound)
-                        {
-                            continue;
-                        }
-                        PrimeSearch.MultipleFound = true;
+                        PrimeSearch.NumberIsComposite = true;
                     }
 
                     // If last to check, announce that the thread last checked the number
                     else if (PrimeSearch.NumberToCheck >= 2 && divisorToCheck == -1)
                     {
-                        if (PrimeSearch.CurrentlyProcessing || PrimeSearch.MultipleFound)
-                        {
-                            continue;
-                        }
-
                         PrimeSearch.LastThreadChecked = ID;
                         PrimeSearch.LastCheckMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
                     }

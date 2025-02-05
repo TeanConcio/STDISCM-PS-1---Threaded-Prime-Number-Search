@@ -45,8 +45,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         private static readonly ReaderWriterLockSlim PrimeIndexCheckLock = new ReaderWriterLockSlim();
         public static int LastThreadChecked { get; set; } = -1;
         public static long LastCheckMilliTime { get; set; } = 0;
-        public static bool MultipleFound { get; set; } = false;
-        public static bool CurrentlyProcessing { get; set; } = false;
+        public static bool NumberIsComposite { get; set; } = false;
+        public static bool MainIsProcessing { get; set; } = false;
 
 
 
@@ -71,9 +71,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 {
                     PrimeRange = int.Parse(parts[1].Trim());
 
-                    if (PrimeRange < 1)
+                    if (PrimeRange < 2)
                     {
-                        Console.WriteLine("Error: Prime Range must be greater than 0. Setting Prime Range to 100");
+                        Console.WriteLine("Error: Prime Range must be greater than 1. Setting Prime Range to 100");
                         PrimeRange = 100;
                     }
 
@@ -227,7 +227,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 while (NumberToCheck <= PrimeRange)
                 {
                     // Reset values
-                    MultipleFound = false;
+                    NumberIsComposite = false;
                     LastThreadChecked = -1;
                     PrimeIndexCheckLock.EnterWriteLock();
                     try
@@ -239,7 +239,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         PrimeIndexCheckLock.ExitWriteLock();
                     }
 
-                    CurrentlyProcessing = false;
+                    MainIsProcessing = false;
 
                     // Set all threads to running
                     //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
@@ -253,16 +253,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     while (!(AllThreadsWaiting() && 
                         PrimeIndexToCheck == -2 && 
                         LastThreadChecked != -1) && 
-                        !MultipleFound)
+                        !NumberIsComposite)
                     {
                         counter++;
                         if (counter > 100000000)
                         {
                             Console.WriteLine("Error: Infinite Loop");
+                            return;
                         }
                     }
 
-                    CurrentlyProcessing = true;
+                    MainIsProcessing = true;
 
                     //// Set all threads to being processed
                     //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
@@ -270,22 +271,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     //    thread.Status = ThreadStatus.BEING_PROCESSED;
                     //}
 
-                    // If multiple found, go to next number
-                    if (MultipleFound)
+                    // If prime found
+                    if (!NumberIsComposite)
                     {
-                        MultipleFound = false;
-                    }
-                    else
-                    {
-                        if (PrimeSearch.NumberToCheck > 7 &&
-                            (PrimeSearch.NumberToCheck % 2 == 0 ||
-                            PrimeSearch.NumberToCheck % 3 == 0 ||
-                            PrimeSearch.NumberToCheck % 5 == 0 ||
-                            PrimeSearch.NumberToCheck % 7 == 0))
-                        {
-                            Console.WriteLine("Error");
-                        }
-
                         // Add Prime Number to Primes List
                         AddPrime(NumberToCheck);
 
