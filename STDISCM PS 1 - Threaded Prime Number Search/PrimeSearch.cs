@@ -40,9 +40,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
         // For By Divisibility Task Division
         public static int NumberToCheck { get; set; } = 1;              // -1 = finished
-        private static readonly object NumberCheckLock = new object();
+        public static readonly ReaderWriterLockSlim NumberCheckLock = new ReaderWriterLockSlim();
         public static int PrimeIndexToCheck { get; set; } = 0;          // -1 = last to check, -2 = finished
-        private static readonly object PrimeIndexCheckLock = new object();
+        private static readonly ReaderWriterLockSlim PrimeIndexCheckLock = new ReaderWriterLockSlim();
         public static int LastThreadChecked { get; set; } = -1;
         public static long LastCheckMilliTime { get; set; } = 0;
         public static bool MultipleFound { get; set; } = false;
@@ -60,10 +60,28 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 if (parts[0].Trim().ToUpper() == "NUM_THREADS")
                 {
                     NumThreads = int.Parse(parts[1].Trim());
+
+                    if (NumThreads < 1)
+                    {
+                        Console.WriteLine("Error: Number of Threads must be greater than 0. Setting Number of Threads to 1");
+                        NumThreads = 1;
+                    }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRIME_RANGE")
                 {
                     PrimeRange = int.Parse(parts[1].Trim());
+
+                    if (PrimeRange < 1)
+                    {
+                        Console.WriteLine("Error: Prime Range must be greater than 0. Setting Prime Range to 100");
+                        PrimeRange = 100;
+                    }
+
+                    if (NumThreads > PrimeRange)
+                    {
+                        Console.WriteLine("Error: Number of Threads is greater than Prime Range. Setting Number of Threads to be equal to Prime Range");
+                        NumThreads = PrimeRange;
+                    }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRINT_MODE")
                 {
@@ -205,35 +223,52 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             if (ThreadTaskDivisionMode == ThreadTaskDivisionMode.BY_DIVISIBILITY)
             {
                 // For each number to check
-                for (NumberToCheck = 1; NumberToCheck <= PrimeRange; NumberToCheck++)
+                NumberToCheck = 1;
+                while (NumberToCheck <= PrimeRange)
                 {
                     // Reset values
+                    MultipleFound = false;
                     LastThreadChecked = -1;
-                    lock (PrimeIndexCheckLock)
+                    PrimeIndexCheckLock.EnterWriteLock();
+                    try
                     {
                         PrimeIndexToCheck = 0;
                     }
+                    finally
+                    {
+                        PrimeIndexCheckLock.ExitWriteLock();
+                    }
 
-                    //CurrentlyProcessing = false;
+                    CurrentlyProcessing = false;
 
                     // Set all threads to running
-                    foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
+                    //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
+                    //{
+                    //    thread.Status = ThreadStatus.RUNNING;
+                    //}
+
+                    int counter = 0;
+
+                    // While there are (any threads running AND no primes to check AND a last thread that checked it)  AND no multiple found, wait
+                    while (!(AllThreadsWaiting() && 
+                        PrimeIndexToCheck == -2 && 
+                        LastThreadChecked != -1) && 
+                        !MultipleFound)
                     {
-                        thread.Status = ThreadStatus.RUNNING;
+                        counter++;
+                        if (counter > 100000000)
+                        {
+                            Console.WriteLine("Error: Infinite Loop");
+                        }
                     }
 
-                    // While there are still threads running or primes to check AND no multiple found
-                    while (!(AllThreadsWaiting() && PrimeIndexToCheck == -2) && !MultipleFound)
-                    {
-                    }
+                    CurrentlyProcessing = true;
 
-                    //CurrentlyProcessing = true;
-
-                    // Set all threads to being processed
-                    foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
-                    {
-                        thread.Status = ThreadStatus.BEING_PROCESSED;
-                    }
+                    //// Set all threads to being processed
+                    //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
+                    //{
+                    //    thread.Status = ThreadStatus.BEING_PROCESSED;
+                    //}
 
                     // If multiple found, go to next number
                     if (MultipleFound)
@@ -242,6 +277,15 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     }
                     else
                     {
+                        if (PrimeSearch.NumberToCheck > 7 &&
+                            (PrimeSearch.NumberToCheck % 2 == 0 ||
+                            PrimeSearch.NumberToCheck % 3 == 0 ||
+                            PrimeSearch.NumberToCheck % 5 == 0 ||
+                            PrimeSearch.NumberToCheck % 7 == 0))
+                        {
+                            Console.WriteLine("Error");
+                        }
+
                         // Add Prime Number to Primes List
                         AddPrime(NumberToCheck);
 
@@ -250,6 +294,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         {
                             Console.WriteLine($"Thread {LastThreadChecked} [{LastCheckMilliTime - StartMilliTime} ms]: {NumberToCheck} is prime");
                         }
+                    }
+
+                    // Increment Number to Check
+                    NumberCheckLock.EnterWriteLock();
+                    try
+                    {
+                        NumberToCheck++;
+                    }
+                    finally
+                    {
+                        NumberCheckLock.ExitWriteLock();
                     }
                 }
             }
@@ -361,45 +416,48 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get next divisor to check
         public static int GetNextDivisorToCheck()
         {
-            lock (PrimeIndexCheckLock)
+            PrimeIndexCheckLock.EnterWriteLock();
+            PrimesListLock.EnterReadLock();
+            try
             {
                 // If prime index to check is last to check or finished, return finished
                 if (PrimeIndexToCheck < 0 || PrimeIndexToCheck >= PrimesList.Count)
                 {
                     PrimeIndexToCheck = -2;
-                    return -2;
+                    return PrimeIndexToCheck;
                 }
 
-                int nextPrime;
-                PrimesListLock.EnterReadLock();
-                try
-                {
-                    nextPrime = PrimesList.ElementAt(PrimeIndexToCheck);
-                }
-                finally
-                {
-                    PrimesListLock.ExitReadLock();
-                }
-                PrimeIndexToCheck++;
+                int nextPrime = PrimesList.ElementAt(PrimeIndexToCheck);
 
                 // If the square of the next prime is less than the current number checked
                 if (nextPrime * nextPrime <= NumberToCheck)
                 {
+                    PrimeIndexToCheck++;
                     return nextPrime;
                 }
                 // If end of prime list, set to last to check
                 else
                 {
-                    PrimeIndexToCheck = -1;
-                    return -1;
+                    if (PrimeIndexToCheck != -1)
+                    {
+                        PrimeIndexToCheck = -1;
+                        return PrimeIndexToCheck;
+                    }
+                    return -2; // Return finished if already set to -1
                 }
+            }
+            finally
+            {
+                PrimesListLock.ExitReadLock();
+                PrimeIndexCheckLock.ExitWriteLock();
             }
         }
 
         // Get next number to check
         public static int GetNextNumberToCheck()
         {
-            lock (NumberCheckLock)
+            NumberCheckLock.EnterWriteLock();
+            try
             {
                 if (NumberToCheck < PrimeRange && NumberToCheck > 0)
                 {
@@ -411,6 +469,10 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     NumberToCheck = -1;
                     return -1;
                 }
+            }
+            finally
+            {
+                NumberCheckLock.ExitWriteLock();
             }
         }
 
