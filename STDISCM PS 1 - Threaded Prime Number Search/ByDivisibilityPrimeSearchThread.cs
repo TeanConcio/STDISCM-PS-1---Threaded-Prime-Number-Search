@@ -17,42 +17,44 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
         override public void Run()
         {
-            int numberToCheck;
-            int divisorToCheck;
-
-            // While there is still a number to check
-            do
+            while (PrimeSearch.NumberToCheck <= PrimeSearch.PrimeRange)
             {
-                // Get the next number and divisor to check
-                divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
-                numberToCheck = PrimeSearch.NumberToCheck;
+                //if (PrimeSearch.CurrentlyProcessing)
+                //{
+                //    Status = ThreadStatus.WAITING;
+                //    continue;
+                //}
+
+                //Status = ThreadStatus.RUNNING;
+
+                int divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
 
                 // If divisor to check is finished, wait until ready
-                if (divisorToCheck == -2)
+                if (PrimeSearch.MultipleFound || divisorToCheck == -2
+                    || Status == ThreadStatus.BEING_PROCESSED
+                    //|| PrimeSearch.CurrentlyProcessing
+                    )
                 {
                     Status = ThreadStatus.WAITING;
                     continue;
                 }
+
+                int numberToCheck = PrimeSearch.NumberToCheck;
+                Status = ThreadStatus.RUNNING;
 
                 // If last to check, announce that the thread last checked the number
                 if (numberToCheck >= 2 && divisorToCheck == -1)
                 {
                     PrimeSearch.LastThreadChecked = ID;
                     PrimeSearch.LastCheckMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-
-                    Status = ThreadStatus.RUNNING;
                 }
 
                 // If the number is divisible by the divisor or is less than 2, it is not prime
                 else if (numberToCheck < 2 || numberToCheck % divisorToCheck == 0)
                 {
                     PrimeSearch.MultipleFound = true;
-                    PrimeSearch.SetPrimeIndexToCheck(-2);
-
-                    Status = ThreadStatus.RUNNING;
                 }
             }
-            while (numberToCheck > 0);
 
             Status = ThreadStatus.FINISHED;
         }
@@ -65,6 +67,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
     {
         RUNNING,
         WAITING,
+        BEING_PROCESSED,
         FINISHED
     }
 }
