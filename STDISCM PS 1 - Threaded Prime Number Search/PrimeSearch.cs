@@ -43,9 +43,10 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         public static readonly ReaderWriterLockSlim NumberCheckLock = new ReaderWriterLockSlim();
         public static int PrimeIndexToCheck { get; set; } = 0;          // -1 = last to check, -2 = finished
         private static readonly ReaderWriterLockSlim PrimeIndexCheckLock = new ReaderWriterLockSlim();
+        public static bool NumberIsComposite { get; set; } = false;
+        public static readonly ReaderWriterLockSlim NumberIsCompositeLock = new ReaderWriterLockSlim();
         public static int LastThreadChecked { get; set; } = -1;
         public static long LastCheckMilliTime { get; set; } = 0;
-        public static bool NumberIsComposite { get; set; } = false;
         public static bool MainIsProcessing { get; set; } = false;
 
 
@@ -227,15 +228,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 while (NumberToCheck <= PrimeRange)
                 {
                     // Reset values
-                    NumberIsComposite = false;
-                    LastThreadChecked = -1;
+                    NumberIsCompositeLock.EnterWriteLock();
                     PrimeIndexCheckLock.EnterWriteLock();
                     try
                     {
+                        NumberIsComposite = false;
+                        LastThreadChecked = -1;
                         PrimeIndexToCheck = 0;
                     }
                     finally
                     {
+                        NumberIsCompositeLock.ExitWriteLock();
                         PrimeIndexCheckLock.ExitWriteLock();
                     }
 
@@ -274,6 +277,21 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     // If prime found
                     if (!NumberIsComposite)
                     {
+                        // Fail safe
+                        //if (NumberToCheck > 19 && (
+                        //    NumberToCheck % 2 == 0 ||
+                        //    NumberToCheck % 3 == 0 ||
+                        //    NumberToCheck % 5 == 0 ||
+                        //    NumberToCheck % 7 == 0 ||
+                        //    NumberToCheck % 11 == 0 ||
+                        //    NumberToCheck % 13 == 0 ||
+                        //    NumberToCheck % 17 == 0 ||
+                        //    NumberToCheck % 19 == 0
+                        //    ))
+                        //{
+                        //    continue;
+                        //}
+
                         // Add Prime Number to Primes List
                         AddPrime(NumberToCheck);
 

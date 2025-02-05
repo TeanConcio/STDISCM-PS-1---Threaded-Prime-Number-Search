@@ -41,12 +41,21 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 Status = ThreadStatus.RUNNING;
 
                 PrimeSearch.NumberCheckLock.EnterReadLock();
+                PrimeSearch.NumberIsCompositeLock.EnterUpgradeableReadLock();
                 try
                 {
                     // If the number is divisible by the divisor or is less than 2, it is not prime
                     if ((PrimeSearch.NumberToCheck < 2 || (divisorToCheck > 1 && PrimeSearch.NumberToCheck % divisorToCheck == 0)))
                     {
-                        PrimeSearch.NumberIsComposite = true;
+                        PrimeSearch.NumberIsCompositeLock.EnterWriteLock();
+                        try
+                        {
+                            PrimeSearch.NumberIsComposite = true;
+                        }
+                        finally
+                        {
+                            PrimeSearch.NumberIsCompositeLock.ExitWriteLock();
+                        }
                     }
 
                     // If last to check, announce that the thread last checked the number
@@ -58,8 +67,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 }
                 finally
                 {
+                    PrimeSearch.NumberIsCompositeLock.ExitUpgradeableReadLock();
                     PrimeSearch.NumberCheckLock.ExitReadLock();
-
                 }
             }
 
