@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,7 +27,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 if (PrimeSearch.IsPrime(i))
                 {
                     // Get Current Time in Milliseconds
-                    long milliTimeNow = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                    DateTime now = DateTime.Now;
+                    long milliTimeNow = now.Ticks / TimeSpan.TicksPerMillisecond;
 
                     // Add Prime Number to Primes List
                     PrimeSearch.AddPrime(i);
@@ -34,7 +36,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     // If Print Mode is Immediate
                     if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
                     {
-                        Console.WriteLine($"Thread {ID} [{milliTimeNow - PrimeSearch.StartMilliTime} ms]: {i} is prime");
+                        Console.WriteLine($"[{now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Thread {ID} ({milliTimeNow - PrimeSearch.StartMilliTime} ms) : {i} is prime");
                     }
                 }
             }

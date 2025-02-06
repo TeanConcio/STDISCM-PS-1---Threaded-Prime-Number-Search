@@ -34,7 +34,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         public static ThreadTaskDivisionMode ThreadTaskDivisionMode { get; set; }
 
         public static PrimeSearchThread[] ThreadsList { get; set; }
-        public static long StartMilliTime { get; set; }
+        private static DateTime StartTime { get; set; }
+        public static long StartMilliTime => StartTime.Ticks / TimeSpan.TicksPerMillisecond;
         public static SortedSet<int> PrimesList { get; set; } = new SortedSet<int>([2, 3, 5, 7]);   // Memoization
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
@@ -46,7 +47,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         public static bool NumberIsComposite { get; set; } = false;
         public static readonly ReaderWriterLockSlim NumberIsCompositeLock = new ReaderWriterLockSlim();
         public static int LastThreadChecked { get; set; } = -1;
-        public static long LastCheckMilliTime { get; set; } = 0;
+        public static DateTime LastCheckTime { get; set; }
+        public static long LastCheckMilliTime => LastCheckTime.Ticks / TimeSpan.TicksPerMillisecond;
         public static bool MainIsProcessing { get; set; } = false;
 
 
@@ -212,8 +214,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Start Threads
         public static void StartThreads()
         {
-            // Get Current Time to Milliseconds
-            StartMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+            // Get Start Time
+            StartTime = DateTime.Now;
+            Console.WriteLine($"\nStart Time: {StartTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} (0 ms)\n");
 
             foreach (PrimeSearchThread thread in ThreadsList)
             {
@@ -244,7 +247,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
                     MainIsProcessing = false;
 
-                    PrimeSearch.SleepMicroseconds(10);
+                    PrimeSearch.SleepMicroseconds(25);
 
                     int counter = 0;    // Counter to check infinite loop
 
@@ -262,7 +265,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         }
 
                         // Sleep microseconds just in case
-                        PrimeSearch.SleepMicroseconds(10);
+                        PrimeSearch.SleepMicroseconds(25);
                     }
 
                     MainIsProcessing = true;
@@ -289,9 +292,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         AddPrime(NumberToCheck);
 
                         // If Print Mode is Immediate
-                        if (PrintMode == PrintMode.IMMEDIATE)
+                        if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
                         {
-                            Console.WriteLine($"Thread {LastThreadChecked} [{LastCheckMilliTime - StartMilliTime} ms]: {NumberToCheck} is prime");
+                            Console.WriteLine($"[{LastCheckTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Thread {LastThreadChecked} ({LastCheckMilliTime - PrimeSearch.StartMilliTime} ms) : {NumberToCheck} is prime");
                         }
                     }
 
@@ -317,19 +320,24 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 thread.Join();
             }
 
+            // Get End Time
+            DateTime endTime = DateTime.Now;
+            long endMilliTime = endTime.Ticks / TimeSpan.TicksPerMillisecond;
+
             // If Print Mode is Delayed
             if (PrintMode == PrintMode.DELAYED)
             {
-                // Get Current Time in Microseconds
-                long microtimeNow = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
                 foreach (int prime in PrimesList)
                 {
-                    Console.WriteLine($"Main Thread [{microtimeNow - StartMilliTime} ms]: {prime} is prime");
+                    Console.WriteLine($"[{endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Main Thread ({endMilliTime - StartMilliTime} ms) : {prime} is prime");
                 }
             }
 
             Console.WriteLine();
             Console.WriteLine($"Total Primes Found: {PrimesList.Count}");
+
+            // Print End Time
+            Console.WriteLine($"\nEnd Time: {endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} ({endMilliTime - StartMilliTime} ms)\n");
         }
 
         // Check if a number is prime

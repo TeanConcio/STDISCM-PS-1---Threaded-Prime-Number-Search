@@ -19,6 +19,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             while (PrimeSearch.NumberToCheck <= PrimeSearch.PrimeRange)
             {
+                // Sleep microseconds just in case
+                PrimeSearch.SleepMicroseconds(25);
+
                 if (PrimeSearch.MainIsProcessing || PrimeSearch.NumberIsComposite)
                 {
                     Status = ThreadStatus.WAITING;
@@ -39,9 +42,6 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 }
                 
                 Status = ThreadStatus.RUNNING;
-
-                // Sleep microseconds just in case
-                PrimeSearch.SleepMicroseconds(10);
 
                 PrimeSearch.NumberCheckLock.EnterReadLock();
                 PrimeSearch.NumberIsCompositeLock.EnterUpgradeableReadLock();
@@ -65,7 +65,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     else if (PrimeSearch.NumberToCheck >= 2 && divisorToCheck == -1)
                     {
                         PrimeSearch.LastThreadChecked = ID;
-                        PrimeSearch.LastCheckMilliTime = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                        PrimeSearch.LastCheckTime = DateTime.Now;
                     }
                 }
                 finally
