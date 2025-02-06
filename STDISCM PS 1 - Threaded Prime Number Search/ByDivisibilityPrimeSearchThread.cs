@@ -41,7 +41,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 Status = ThreadStatus.RUNNING;
 
                 // Sleep microseconds just in case
-                PrimeSearch.SleepMicroseconds(5);
+                PrimeSearch.SleepMicroseconds(10);
 
                 PrimeSearch.NumberCheckLock.EnterReadLock();
                 PrimeSearch.NumberIsCompositeLock.EnterUpgradeableReadLock();
