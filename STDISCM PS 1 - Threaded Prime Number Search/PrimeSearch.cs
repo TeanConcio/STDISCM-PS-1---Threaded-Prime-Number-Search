@@ -39,7 +39,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
         // For By Divisibility Task Division
-        public static int NumberToCheck { get; set; } = 1;              // -1 = finished
+        public static int NumberToCheck { get; set; } = 1;
         public static readonly ReaderWriterLockSlim NumberCheckLock = new ReaderWriterLockSlim();
         public static int PrimeIndexToCheck { get; set; } = 0;          // -1 = last to check, -2 = finished
         private static readonly ReaderWriterLockSlim PrimeIndexCheckLock = new ReaderWriterLockSlim();
@@ -244,40 +244,31 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
                     MainIsProcessing = false;
 
-                    // Set all threads to running
-                    //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
-                    //{
-                    //    thread.Status = ThreadStatus.RUNNING;
-                    //}
+                    // Sleep microseconds just in case)
+                    PrimeSearch.SleepMicroseconds(1);
 
-                    int counter = 0;
+                    int counter = 0;    // Counter to check infinite loop
 
                     // While there are (any threads running AND no primes to check AND a last thread that checked it)  AND no multiple found, wait
-                    while (!(AllThreadsWaiting() && 
-                        PrimeIndexToCheck == -2 && 
-                        LastThreadChecked != -1) && 
-                        !NumberIsComposite)
+                    while ((!(AllThreadsWaiting() && PrimeIndexToCheck == -2 && LastThreadChecked != -1) && 
+                        !NumberIsComposite) 
+                        || NumberCheckLock.IsReadLockHeld || PrimeIndexCheckLock.IsReadLockHeld || NumberIsCompositeLock.IsUpgradeableReadLockHeld
+                        )
                     {
                         counter++;
                         if (counter > 100000000)
                         {
-                            Console.WriteLine("Error: Infinite Loop");
+                            Console.WriteLine("Error: Infinite Loop. This shouldn't happen...");
                             return;
                         }
                     }
 
                     MainIsProcessing = true;
 
-                    //// Set all threads to being processed
-                    //foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
-                    //{
-                    //    thread.Status = ThreadStatus.BEING_PROCESSED;
-                    //}
-
                     // If prime found
                     if (!NumberIsComposite)
                     {
-                        // Fail safe
+                        // BS Fail safe I don't want to use
                         //if (NumberToCheck > 19 && (
                         //    NumberToCheck % 2 == 0 ||
                         //    NumberToCheck % 3 == 0 ||
@@ -493,6 +484,27 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 }
             }
             return true;
+        }
+
+        // Sleep for microseconds
+        public static void SleepMicroseconds(int microseconds)
+        {
+            int milliseconds = microseconds / 1000;
+            int remainingMicroseconds = microseconds % 1000;
+
+            if (milliseconds > 0)
+            {
+                Thread.Sleep(milliseconds);
+            }
+
+            if (remainingMicroseconds > 0)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                while (sw.ElapsedTicks < remainingMicroseconds * (TimeSpan.TicksPerMillisecond / 1000))
+                {
+                    // Busy wait
+                }
+            }
         }
     }
 }
