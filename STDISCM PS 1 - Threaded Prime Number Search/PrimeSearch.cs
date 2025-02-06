@@ -244,8 +244,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
                     MainIsProcessing = false;
 
-                    // Sleep microseconds just in case)
-                    PrimeSearch.SleepMicroseconds(1);
+                    PrimeSearch.SleepMicroseconds(5);
 
                     int counter = 0;    // Counter to check infinite loop
 
@@ -261,6 +260,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                             Console.WriteLine("Error: Infinite Loop. This shouldn't happen...");
                             return;
                         }
+
+                        // Sleep microseconds just in case
+                        PrimeSearch.SleepMicroseconds(5);
                     }
 
                     MainIsProcessing = true;
