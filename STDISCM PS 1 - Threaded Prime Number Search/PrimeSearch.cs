@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -28,14 +29,20 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
     internal class PrimeSearch
     {
+        // Configs
         public static int NumThreads { get; set; }
         public static int PrimeRange { get; set; }
         public static PrintMode PrintMode { get; set; }
         public static ThreadTaskDivisionMode ThreadTaskDivisionMode { get; set; }
 
-        public static PrimeSearchThread[] ThreadsList { get; set; }
+        // Time keeping
         private static DateTime StartTime { get; set; }
         public static long StartMilliTime => StartTime.Ticks / TimeSpan.TicksPerMillisecond;
+
+        private static Stopwatch Stopwatch = new Stopwatch();
+
+        // Threads and Primes List
+        public static PrimeSearchThread[] ThreadsList { get; set; }
         public static SortedSet<int> PrimesList { get; set; } = new SortedSet<int>([2, 3, 5, 7]);   // Memoization
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
@@ -56,34 +63,51 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get prime search configurations from config.txt
         public static void GetConfig()
         {
+            bool hasError = false;
+
             string[] lines = System.IO.File.ReadAllLines("config.txt");
             foreach (string line in lines)
             {
+                // Skip empty lines or comments (#)
+                if (line.Trim() == "" || line.Trim().StartsWith("#"))
+                {
+                    continue;
+                }
+
+                // Split line by "="
                 string[] parts = line.Split("=");
+
                 if (parts[0].Trim().ToUpper() == "NUM_THREADS")
                 {
-                    NumThreads = int.Parse(parts[1].Trim());
-
-                    if (NumThreads < 1)
+                    if (!int.TryParse(parts[1].Trim(), out int numThreads) || numThreads < 1)
                     {
-                        Console.WriteLine("Error: Number of Threads must be greater than 0. Setting Number of Threads to 1");
-                        NumThreads = 1;
+                        Console.WriteLine("Error: Invalid Number of Threads. Setting Number of Threads to 4.");
+                        NumThreads = 4;
+                        hasError = true;
+                    }
+                    else
+                    {
+                        NumThreads = numThreads;
                     }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRIME_RANGE")
                 {
-                    PrimeRange = int.Parse(parts[1].Trim());
-
-                    if (PrimeRange < 2)
+                    if (!int.TryParse(parts[1].Trim(), out int primeRange) || primeRange < 1)
                     {
-                        Console.WriteLine("Error: Prime Range must be greater than 1. Setting Prime Range to 100");
-                        PrimeRange = 100;
+                        Console.WriteLine("Error: Invalid Prime Range. Setting Prime Range to 1000.");
+                        PrimeRange = 1000;
+                        hasError = true;
+                    }
+                    else
+                    {
+                        PrimeRange = primeRange;
                     }
 
                     if (NumThreads > PrimeRange)
                     {
-                        Console.WriteLine("Error: Number of Threads is greater than Prime Range. Setting Number of Threads to be equal to Prime Range");
+                        Console.WriteLine("Error: Number of Threads is greater than Prime Range. Setting Number of Threads to be equal to Prime Range.");
                         NumThreads = PrimeRange;
+                        hasError = true;
                     }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRINT_MODE")
@@ -100,6 +124,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         PrintMode = PrintMode.DELAYED;
                     }
+                    else
+                    {
+                        Console.WriteLine("Error: Invalid Print Mode. Setting Print Mode to IMMEDIATE.");
+                        PrintMode = PrintMode.IMMEDIATE;
+                        hasError = true;
+                    }
                 }
                 else if (parts[0].Trim().ToUpper() == "THREAD_TASK_DIVISION_MODE")
                 {
@@ -115,7 +145,19 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         ThreadTaskDivisionMode = ThreadTaskDivisionMode.BY_NUMBER;
                     }
+                    else
+                    {
+                        Console.WriteLine("Error: Invalid Thread Task Division Mode. Setting Thread Task Division Mode to BY_RANGE.");
+                        ThreadTaskDivisionMode = ThreadTaskDivisionMode.BY_RANGE;
+                        hasError = true;
+                    }
                 }
+            }
+
+            // If there is an error, print a line
+            if (hasError)
+            {
+                Console.WriteLine();
             }
 
             // Print Configurations
@@ -216,7 +258,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             // Get Start Time
             StartTime = DateTime.Now;
-            Console.WriteLine($"\nStart Time: {StartTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} (0 ms)\n");
+            Console.WriteLine($"Start Time: {StartTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} (0 ms)\n");
+            Stopwatch.StartNew();
 
             foreach (PrimeSearchThread thread in ThreadsList)
             {
@@ -329,12 +372,20 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             {
                 foreach (int prime in PrimesList)
                 {
-                    Console.WriteLine($"[{endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Main Thread ({endMilliTime - StartMilliTime} ms) : {prime} is prime");
+                    if (prime <= PrimeRange)
+                    {
+                        Console.WriteLine($"[{endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Main Thread ({endMilliTime - StartMilliTime} ms) : {prime} is prime");
+                    }
                 }
             }
 
-            Console.WriteLine();
-            Console.WriteLine($"Total Primes Found: {PrimesList.Count}");
+            // Get number of primes in Prime List that are less than or equal to Prime Range
+            int primeCount = PrimesList.Count(prime => prime <= PrimeRange);
+            if (primeCount > 0)
+            {
+                Console.WriteLine();
+            }
+            Console.WriteLine($"Total Primes Found: {primeCount}");
 
             // Print End Time
             Console.WriteLine($"\nEnd Time: {endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} ({endMilliTime - StartMilliTime} ms)\n");
