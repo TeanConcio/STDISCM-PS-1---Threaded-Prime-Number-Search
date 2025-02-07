@@ -29,7 +29,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     DateTime currentTime = DateTime.Now;
 
                     // Add Prime Number to Primes List
-                    PrimeSearch.AddPrime(i);
+                    PrimeSearch.AddPrime(i, ID, nanoTime);
 
                     // If Print Mode is Immediate
                     if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)

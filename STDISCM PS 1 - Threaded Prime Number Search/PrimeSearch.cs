@@ -42,6 +42,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Threads and Primes List
         public static PrimeSearchThread[] ThreadsList { get; set; }
         public static SortedSet<int> PrimesList { get; set; } = new SortedSet<int>([2, 3, 5, 7]);   // Memoization
+        public static Dictionary<int, (int ThreadID, long NanoTimestamp)> PrimeDetails { get; set; } = new Dictionary<int, (int ThreadID, long NanoTimestamp)>();
         private static readonly ReaderWriterLockSlim PrimesListLock = new ReaderWriterLockSlim();
 
         // For By Divisibility Task Division
@@ -61,7 +62,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Get prime search configurations from config.txt
         public static void GetConfig()
         {
-            bool hasError = false;
+            bool hasErrorWarning = false;
 
             string[] lines = System.IO.File.ReadAllLines("config.txt");
             foreach (string line in lines)
@@ -81,16 +82,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         Console.WriteLine("Error: Invalid Number of Threads. Setting Number of Threads to 4.");
                         NumThreads = 4;
-                        hasError = true;
+                        hasErrorWarning = true;
                     }
                     else
                     {
                         NumThreads = numThreads;
 
                         // Warning
-                        if (NumThreads > 50)
+                        if (NumThreads >= 50)
                         {
-                            Console.WriteLine("Warning: Higher number of threads may cause the program to run slower or run out of memory, but suit yourself.");
+                            Console.WriteLine("Warning: Higher number of threads may cause the program to run slower or run out of memory, especially for BY_DIVISIBILITY, but suit yourself.");
+                            hasErrorWarning = true;
                         }
                     }
                 }
@@ -100,16 +102,17 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         Console.WriteLine("Error: Invalid Prime Range. Setting Prime Range to 1000.");
                         PrimeRange = 1000;
-                        hasError = true;
+                        hasErrorWarning = true;
                     }
                     else
                     {
                         PrimeRange = primeRange;
 
                         // Warning
-                        if (PrimeRange > 10_000_000)
+                        if (PrimeRange >= 10_000_000)
                         {
                             Console.WriteLine("Warning: Higher prime range may cause the program to run longer or run out of memory, but suit yourself.");
+                            hasErrorWarning = true;
                         }
                     }
 
@@ -118,7 +121,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         Console.WriteLine("Error: Number of Threads is greater than Prime Range. Setting Number of Threads to be equal to Prime Range.");
                         NumThreads = PrimeRange;
-                        hasError = true;
+                        hasErrorWarning = true;
                     }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRINT_MODE")
@@ -139,7 +142,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         Console.WriteLine("Error: Invalid Print Mode. Setting Print Mode to IMMEDIATE.");
                         PrintMode = PrintMode.IMMEDIATE;
-                        hasError = true;
+                        hasErrorWarning = true;
                     }
                 }
                 else if (parts[0].Trim().ToUpper() == "THREAD_TASK_DIVISION_MODE")
@@ -160,13 +163,13 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     {
                         Console.WriteLine("Error: Invalid Thread Task Division Mode. Setting Thread Task Division Mode to BY_RANGE.");
                         ThreadTaskDivisionMode = ThreadTaskDivisionMode.BY_RANGE;
-                        hasError = true;
+                        hasErrorWarning = true;
                     }
                 }
             }
 
             // If there is an error, print a line
-            if (hasError)
+            if (hasErrorWarning)
             {
                 Console.WriteLine();
             }
@@ -269,9 +272,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             // Get Start Time
             StartTime = DateTime.Now;
-            Console.WriteLine($"Start Time: {FormatDateTime(StartTime)} (0 ns)\n");
             NanoStopwatch.Restart();
             NanoStopwatch.Start();
+            Console.WriteLine($"Start Time: {FormatDateTime(StartTime)} ({FormatNanoTime(GetElapsedNanoTime())} ns)\n");
 
             foreach (PrimeSearchThread thread in ThreadsList)
             {
@@ -307,8 +310,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     int counter = 0;    // Counter to check infinite loop
 
                     // While there are (any threads running AND no primes to check AND a last thread that checked it)  AND no multiple found, wait
-                    while ((!(AreAllThreadsWaiting() && PrimeIndexToCheck == -2 && LastThreadChecked != -1) && 
-                        !NumberIsComposite) 
+                    while ((!(AreAllThreadsWaiting() && PrimeIndexToCheck == -2 && LastThreadChecked != -1) &&
+                        !NumberIsComposite)
                         || NumberCheckLock.IsReadLockHeld || PrimeIndexCheckLock.IsReadLockHeld || NumberIsCompositeLock.IsUpgradeableReadLockHeld
                         )
                     {
@@ -329,22 +332,13 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     if (!NumberIsComposite)
                     {
                         // BS Fail safe I don't want to use
-                        //if (NumberToCheck > 19 && (
-                        //    NumberToCheck % 2 == 0 ||
-                        //    NumberToCheck % 3 == 0 ||
-                        //    NumberToCheck % 5 == 0 ||
-                        //    NumberToCheck % 7 == 0 ||
-                        //    NumberToCheck % 11 == 0 ||
-                        //    NumberToCheck % 13 == 0 ||
-                        //    NumberToCheck % 17 == 0 ||
-                        //    NumberToCheck % 19 == 0
-                        //    ))
-                        //{
-                        //    continue;
-                        //}
+                        if (!IsPrimeFailSafe(NumberToCheck))
+                        {
+                            continue;
+                        }
 
                         // Add Prime Number to Primes List
-                        AddPrime(NumberToCheck);
+                        AddPrime(NumberToCheck, LastThreadChecked, LastCheckNanoTime);
 
                         // If Print Mode is Immediate
                         if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
@@ -375,9 +369,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 thread.Join();
             }
 
-            // Get End Time
-            long endNanoTime = GetElapsedNanoTime();
-            DateTime endTime = DateTime.Now;
+            // Get End Time (old implementation)
+            //long endNanoTime = GetElapsedNanoTime();
+            //DateTime endTime = DateTime.Now;
 
             // If Print Mode is Delayed
             if (PrintMode == PrintMode.DELAYED)
@@ -386,7 +380,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 {
                     if (prime <= PrimeRange)
                     {
-                        Console.WriteLine(FormatPrimeFoundLog(endTime, -1, endNanoTime, prime));
+                        //Console.WriteLine(FormatPrimeFoundLog(endTime, -1, endNanoTime, prime));
+
+                        if (PrimeDetails.TryGetValue(prime, out var details))
+                        {
+                            Console.WriteLine(FormatPrimeFoundLog(DateTime.Now, details.ThreadID, details.NanoTimestamp, prime));
+                        }
                     }
                 }
             }
@@ -468,13 +467,18 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         }
 
         // Add prime to the sorted set
-        public static void AddPrime(int prime)
+        public static void AddPrime(int prime, int threadID, long nanoTimestamp)
         {
             //PrimesListLock.EnterUpgradeableReadLock();
             PrimesListLock.EnterWriteLock();
             try
             {
                 PrimesList.Add(prime);
+
+                if (PrintMode == PrintMode.DELAYED)
+                {
+                    PrimeDetails.Add(prime, (threadID, nanoTimestamp));
+                }
             }
             finally
             {
@@ -560,7 +564,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         }
 
         // Sleep for microseconds
-        public static void SleepMicroseconds(int microseconds = 1)
+        public static void SleepMicroseconds(int microseconds = 10)
         {
             int milliseconds = microseconds / 1000;
             int remainingMicroseconds = microseconds % 1000;
@@ -589,7 +593,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         // Format Time
         public static string FormatDateTime(DateTime time)
             => time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            //=> time.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+        //=> time.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
 
         // Format Nanoseconds
         public static string FormatNanoTime(long nanoTime)
@@ -605,6 +609,26 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             }
 
             return $"[{FormatDateTime(time)}] Thread {threadID} ({FormatNanoTime(nanoTime)} ns) : {prime} is prime";
+        }
+
+        // Fail safe I don't want to use
+        public static bool IsPrimeFailSafe(int number)
+        {
+            if (NumberToCheck > 19 && (
+                NumberToCheck % 2 == 0 ||
+                NumberToCheck % 3 == 0 ||
+                NumberToCheck % 5 == 0 ||
+                NumberToCheck % 7 == 0 ||
+                NumberToCheck % 11 == 0 ||
+                NumberToCheck % 13 == 0 ||
+                NumberToCheck % 17 == 0 ||
+                NumberToCheck % 19 == 0
+                ))
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

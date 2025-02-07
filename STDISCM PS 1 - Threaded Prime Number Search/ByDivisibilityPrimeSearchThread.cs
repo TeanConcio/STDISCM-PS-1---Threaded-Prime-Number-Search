@@ -30,11 +30,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 int divisorToCheck = PrimeSearch.GetNextDivisorToCheck();
 
                 // If divisor to check is finished, wait until ready
-                if (divisorToCheck == -2
-                    //|| PrimeSearch.MultipleFound || 
-                    //|| Status == ThreadStatus.BEING_PROCESSED
-                    //|| PrimeSearch.CurrentlyProcessing
-                    )
+                if (divisorToCheck == -2)
                 {
                     Status = ThreadStatus.WAITING;
                     continue;
