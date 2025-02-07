@@ -20,9 +20,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             {
                 if (PrimeSearch.IsPrime(numberToCheck))
                 {
-                    // Get Current Time in Milliseconds
-                    DateTime now = DateTime.Now;
-                    long milliTimeNow = now.Ticks / TimeSpan.TicksPerMillisecond;
+                    // Get Current Time
+                    long nanoTime = PrimeSearch.GetElapsedNanoTime();
+                    DateTime currentTime = DateTime.Now;
 
                     // Add Prime Number to Primes List
                     PrimeSearch.AddPrime(numberToCheck);
@@ -30,7 +30,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     // If Print Mode is Immediate
                     if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
                     {
-                        Console.WriteLine($"[{now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Thread {ID} ({milliTimeNow - PrimeSearch.StartMilliTime} ms) : {numberToCheck} is prime");
+                        Console.WriteLine(PrimeSearch.FormatPrimeFoundLog(currentTime, ID, nanoTime, numberToCheck));
                     }
                 }
 

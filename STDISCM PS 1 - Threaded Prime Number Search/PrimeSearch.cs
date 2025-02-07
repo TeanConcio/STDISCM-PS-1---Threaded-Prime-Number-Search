@@ -37,9 +37,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
         // Time keeping
         private static DateTime StartTime { get; set; }
-        public static long StartMilliTime => StartTime.Ticks / TimeSpan.TicksPerMillisecond;
-
-        private static Stopwatch Stopwatch = new Stopwatch();
+        private static readonly Stopwatch NanoStopwatch = new Stopwatch();
 
         // Threads and Primes List
         public static PrimeSearchThread[] ThreadsList { get; set; }
@@ -54,8 +52,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         public static bool NumberIsComposite { get; set; } = false;
         public static readonly ReaderWriterLockSlim NumberIsCompositeLock = new ReaderWriterLockSlim();
         public static int LastThreadChecked { get; set; } = -1;
+        public static long LastCheckNanoTime { get; set; }
         public static DateTime LastCheckTime { get; set; }
-        public static long LastCheckMilliTime => LastCheckTime.Ticks / TimeSpan.TicksPerMillisecond;
         public static bool MainIsProcessing { get; set; } = false;
 
 
@@ -88,6 +86,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     else
                     {
                         NumThreads = numThreads;
+
+                        // Warning
+                        if (NumThreads > 50)
+                        {
+                            Console.WriteLine("Warning: Higher number of threads may cause the program to run slower or run out of memory, but suit yourself.");
+                        }
                     }
                 }
                 else if (parts[0].Trim().ToUpper() == "PRIME_RANGE")
@@ -101,8 +105,15 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     else
                     {
                         PrimeRange = primeRange;
+
+                        // Warning
+                        if (PrimeRange > 10_000_000)
+                        {
+                            Console.WriteLine("Warning: Higher prime range may cause the program to run longer or run out of memory, but suit yourself.");
+                        }
                     }
 
+                    // If Number of Threads is greater than Prime Range, set Number of Threads to be equal to Prime Range
                     if (NumThreads > PrimeRange)
                     {
                         Console.WriteLine("Error: Number of Threads is greater than Prime Range. Setting Number of Threads to be equal to Prime Range.");
@@ -258,8 +269,9 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         {
             // Get Start Time
             StartTime = DateTime.Now;
-            Console.WriteLine($"Start Time: {StartTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} (0 ms)\n");
-            Stopwatch.StartNew();
+            Console.WriteLine($"Start Time: {FormatDateTime(StartTime)} (0 ns)\n");
+            NanoStopwatch.Restart();
+            NanoStopwatch.Start();
 
             foreach (PrimeSearchThread thread in ThreadsList)
             {
@@ -290,12 +302,12 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
                     MainIsProcessing = false;
 
-                    PrimeSearch.SleepMicroseconds(25);
+                    PrimeSearch.SleepMicroseconds();
 
                     int counter = 0;    // Counter to check infinite loop
 
                     // While there are (any threads running AND no primes to check AND a last thread that checked it)  AND no multiple found, wait
-                    while ((!(AllThreadsWaiting() && PrimeIndexToCheck == -2 && LastThreadChecked != -1) && 
+                    while ((!(AreAllThreadsWaiting() && PrimeIndexToCheck == -2 && LastThreadChecked != -1) && 
                         !NumberIsComposite) 
                         || NumberCheckLock.IsReadLockHeld || PrimeIndexCheckLock.IsReadLockHeld || NumberIsCompositeLock.IsUpgradeableReadLockHeld
                         )
@@ -308,7 +320,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         }
 
                         // Sleep microseconds just in case
-                        PrimeSearch.SleepMicroseconds(25);
+                        PrimeSearch.SleepMicroseconds();
                     }
 
                     MainIsProcessing = true;
@@ -337,7 +349,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                         // If Print Mode is Immediate
                         if (PrimeSearch.PrintMode == PrintMode.IMMEDIATE)
                         {
-                            Console.WriteLine($"[{LastCheckTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Thread {LastThreadChecked} ({LastCheckMilliTime - PrimeSearch.StartMilliTime} ms) : {NumberToCheck} is prime");
+                            Console.WriteLine(FormatPrimeFoundLog(LastCheckTime, LastThreadChecked, LastCheckNanoTime, NumberToCheck));
                         }
                     }
 
@@ -364,8 +376,8 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             }
 
             // Get End Time
+            long endNanoTime = GetElapsedNanoTime();
             DateTime endTime = DateTime.Now;
-            long endMilliTime = endTime.Ticks / TimeSpan.TicksPerMillisecond;
 
             // If Print Mode is Delayed
             if (PrintMode == PrintMode.DELAYED)
@@ -374,7 +386,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                 {
                     if (prime <= PrimeRange)
                     {
-                        Console.WriteLine($"[{endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)}] Main Thread ({endMilliTime - StartMilliTime} ms) : {prime} is prime");
+                        Console.WriteLine(FormatPrimeFoundLog(endTime, -1, endNanoTime, prime));
                     }
                 }
             }
@@ -388,7 +400,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             Console.WriteLine($"Total Primes Found: {primeCount}");
 
             // Print End Time
-            Console.WriteLine($"\nEnd Time: {endTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)} ({endMilliTime - StartMilliTime} ms)\n");
+            Console.WriteLine($"\nEnd Time: {FormatDateTime(DateTime.Now)} ({FormatNanoTime(GetElapsedNanoTime())} ns)\n");
         }
 
         // Check if a number is prime
@@ -535,7 +547,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         }
 
         // Check if all threads are waiting
-        public static bool AllThreadsWaiting()
+        public static bool AreAllThreadsWaiting()
         {
             foreach (ByDivisibilityPrimeSearchThread thread in ThreadsList)
             {
@@ -548,7 +560,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
         }
 
         // Sleep for microseconds
-        public static void SleepMicroseconds(int microseconds)
+        public static void SleepMicroseconds(int microseconds = 1)
         {
             int milliseconds = microseconds / 1000;
             int remainingMicroseconds = microseconds % 1000;
@@ -560,12 +572,39 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 
             if (remainingMicroseconds > 0)
             {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var sw = Stopwatch.StartNew();
                 while (sw.ElapsedTicks < remainingMicroseconds * (TimeSpan.TicksPerMillisecond / 1000))
                 {
                     // Busy wait
                 }
             }
+        }
+
+        // Get Elapsed Nano Time
+        public static long GetElapsedNanoTime()
+        {
+            return (long)(NanoStopwatch.ElapsedTicks * (1_000_000_000.0 / Stopwatch.Frequency));
+        }
+
+        // Format Time
+        public static string FormatDateTime(DateTime time)
+            => time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            //=> time.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+
+        // Format Nanoseconds
+        public static string FormatNanoTime(long nanoTime)
+            => nanoTime.ToString("N0", CultureInfo.InvariantCulture);
+
+        // Format Prime Found Log
+        public static string FormatPrimeFoundLog(DateTime time, int threadID, long nanoTime, int prime)
+        {
+            // If threadID is -1, it is the main thread
+            if (threadID < 0)
+            {
+                return $"[{FormatDateTime(time)}] Main Thread ({FormatNanoTime(nanoTime)} ns) : {prime} is prime";
+            }
+
+            return $"[{FormatDateTime(time)}] Thread {threadID} ({FormatNanoTime(nanoTime)} ns) : {prime} is prime";
         }
     }
 }

@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace STDISCM_PS_1___Threaded_Prime_Number_Search
 {
-
     internal class ByDivisibilityPrimeSearchThread : PrimeSearchThread
     {
         public ThreadStatus Status { get; set; } = ThreadStatus.RUNNING;
@@ -20,7 +19,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
             while (PrimeSearch.NumberToCheck <= PrimeSearch.PrimeRange)
             {
                 // Sleep microseconds just in case
-                PrimeSearch.SleepMicroseconds(25);
+                PrimeSearch.SleepMicroseconds();
 
                 if (PrimeSearch.MainIsProcessing || PrimeSearch.NumberIsComposite)
                 {
@@ -65,6 +64,7 @@ namespace STDISCM_PS_1___Threaded_Prime_Number_Search
                     else if (PrimeSearch.NumberToCheck >= 2 && divisorToCheck == -1)
                     {
                         PrimeSearch.LastThreadChecked = ID;
+                        PrimeSearch.LastCheckNanoTime = PrimeSearch.GetElapsedNanoTime();
                         PrimeSearch.LastCheckTime = DateTime.Now;
                     }
                 }
